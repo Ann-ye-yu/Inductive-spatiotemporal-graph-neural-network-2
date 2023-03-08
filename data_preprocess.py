@@ -43,8 +43,6 @@ def download_dataset(dataset, files, data_dir):
 
         os.rename(target_dir, data_dir)
 def load_data(fname, seed=1234):
-    u_features = None
-    v_features = None
     print('Loading dataset', fname)
     data_dir = 'raw_data/' + fname
     if fname =='musical_instruments':
@@ -132,61 +130,7 @@ def load_data(fname, seed=1234):
         u_nodes, v_nodes = u_nodes_ratings.astype(np.int64), v_nodes_ratings.astype(np.int64)
         ratings = ratings.astype(np.float32)
         timestamp = timestamp.astype(np.float64)
-
-        # Load movie features
-        movies_file = data_dir + files[1]
-        movies_headers = ['movie_id', 'title', 'genre']
-        movies_df = pd.read_csv(movies_file, sep=sep, header=None,
-                                names=movies_headers, engine='python', encoding="ISO-8859-1")
-        # Extracting all genres
-        genres = []
-        for s in movies_df['genre'].values:
-            genres.extend(s.split('|'))
-        genres = list(set(genres))
-        num_genres = len(genres)
-
-        genres_dict = {g: idx for idx, g in enumerate(genres)}
-
-        # Creating 0 or 1 valued features for all genres
-        v_features = np.zeros((num_items, num_genres), dtype=np.float32)  # （3706，18）
-        for movie_id, s in zip(movies_df['movie_id'].values.tolist(), movies_df['genre'].values.tolist()):
-            # Check if movie_id was listed in ratings file and therefore in mapping dictionary
-            if movie_id in v_dict.keys():
-                gen = s.split('|')
-                for g in gen:
-                    v_features[v_dict[movie_id], genres_dict[g]] = 1.
-
-        # Load user features
-        users_file = data_dir + files[2]
-        users_headers = ['user_id', 'gender', 'age', 'occupation', 'zip-code']
-        users_df = pd.read_csv(users_file, sep=sep, header=None,
-                               names=users_headers, engine='python')
-
-        # Extracting all features
-        cols = users_df.columns.values[1:]
-
-        cntr = 0
-        feat_dicts = []
-        for header in cols:
-            d = dict()
-            feats = np.unique(users_df[header].values).tolist()
-            d.update({f: i for i, f in enumerate(feats, start=cntr)})
-            feat_dicts.append(d)
-            cntr += len(d)
-
-        num_feats = sum(len(d) for d in feat_dicts)  # (3469)
-
-        u_features = np.zeros((num_users, num_feats), dtype=np.float32)  # (6040,3469)
-        for _, row in users_df.iterrows():
-            u_id = row['user_id']
-            if u_id in u_dict.keys():
-                for k, header in enumerate(cols):
-                    u_features[u_dict[u_id], feat_dicts[k][row[header]]] = 1.
-
-        u_features = sp.csr_matrix(u_features)  # (6040,3469)
-        v_features = sp.csr_matrix(v_features)  # (3706,18)
-
-    return num_users, num_items, u_nodes, v_nodes, ratings, u_features, v_features, timestamp
+    return num_users, num_items, u_nodes, v_nodes, ratings,  timestamp
 
 def create_trainvaltest_split(dataset, seed=1234, testing=False, datasplit_path=None,
                               datasplit_from_file=False, verbose=True, rating_map=None,
@@ -197,20 +141,19 @@ def create_trainvaltest_split(dataset, seed=1234, testing=False, datasplit_path=
     For each split computes 1-of-num_classes labels. Also computes training
     adjacency matrix.
     """
-    if datasplit_from_file and os.path.isfile(datasplit_path) and 1==0:
+    if datasplit_from_file and os.path.isfile(datasplit_path):
         print('Reading processed dataset from file...')
         with open(datasplit_path,'rb') as f:
-            num_users, num_items, u_nodes, v_nodes, ratings, u_features, v_features, timestamp = pkl.load(f)
+            num_users, num_items, u_nodes, v_nodes, ratings, timestamp = pkl.load(f)
         print('Number of users = %d' % num_users)
         print('Number of items = %d' % num_items)
         print('Number of links = %d' % ratings.shape[0])
         print('Fraction of positive links = %.4f' % (float(ratings.shape[0]) / (num_users * num_items),))
 
     else:
-        num_users, num_items, u_nodes, v_nodes, ratings, u_features, v_features, timestamp = load_data(dataset,
-                                                                                                       seed=seed)
+        num_users, num_items, u_nodes, v_nodes, ratings, timestamp = load_data(dataset,seed=seed)
         with open(datasplit_path, 'wb') as f:
-            pkl.dump([num_users, num_items, u_nodes, v_nodes, ratings, u_features, v_features,timestamp], f)
+            pkl.dump([num_users, num_items, u_nodes, v_nodes, ratings, timestamp], f)
 
     if rating_map is not None:
         for i, x in enumerate(ratings):
@@ -262,7 +205,7 @@ def create_trainvaltest_split(dataset, seed=1234, testing=False, datasplit_path=
     timestamp_mx_train = sp.csr_matrix((timestamp, [u_train_idx, v_train_idx]),
                                        shape=[num_users, num_items], dtype=np.float64)
 
-    return u_features, v_features, rating_mx_train, train_labels, u_train_idx, v_train_idx, \
+    return rating_mx_train, train_labels, u_train_idx, v_train_idx, \
            val_labels, u_val_idx, v_val_idx, test_labels, u_test_idx, v_test_idx, class_values, timestamp_mx_train, num_users, num_items
 
 

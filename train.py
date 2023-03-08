@@ -78,7 +78,7 @@ def train_multiple_epochs(train_dataset,
     if torch.cuda.is_available():
         torch.cuda.synchronize()
 
-    batch_pbar = len(train_dataset) >= 100000
+    batch_pbar = len(train_dataset) >= 10000
     t_start = time.perf_counter()
     if not batch_pbar:
         pbar = tqdm(range(start_epoch, epochs + start_epoch))

@@ -53,6 +53,7 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true', default=False,
                         help='turn on debugging mode which uses a small number of data')
     parser.add_argument('--data-name', default='musical_instruments', help='dataset name')
+    # parser.add_argument('--data-name', default='ml_1m', help='dataset name')
     parser.add_argument('--data-appendix', default='_mnph100',
                         help='what to append to save-names when saving datasets')
     parser.add_argument('--save-appendix', default='_mnhp100',
@@ -83,8 +84,6 @@ if __name__ == '__main__':
                         help='if < 1, subsample nodes per hop according to the ratio')
     parser.add_argument('--max-nodes-per-hop', default=100,
                         help='if > 0, upper bound the # nodes per hop by another subsampling')
-    parser.add_argument('--use-features', action='store_true', default=False,
-                        help='whether to use node features (side information)')
     # edge dropout settings
     parser.add_argument('--adj-dropout', type=float, default=0,
                         help='if not 0, random drops edges from adjacency matrix with this prob')
@@ -122,6 +121,8 @@ if __name__ == '__main__':
     parser.add_argument('--ratio', type=float, default=1.0,
                         help="For ml datasets, if ratio < 1, downsample training data to the\
                         target ratio")
+    parser.add_argument('--subgraph-num',type=int,default=5,
+                        help= "number of subgrphs")
 
 
     '''
@@ -135,10 +136,11 @@ if __name__ == '__main__':
     np.random.seed(args.seed)
     print(args)
 
-    args.hop = int(args.hop)
     # --max-nodes-per-hop, default=100,if > 0, upper bound the # nodes per hop by another subsampling
+    args.hop = int(args.hop)
     if args.max_nodes_per_hop is not None:
         args.max_nodes_per_hop = int(args.max_nodes_per_hop)
+
     rating_map, post_rating_map = None, None
     # '--transfer', default='',help='if not empty, load the pretrained models in this path'
     if args.transfer:
@@ -150,44 +152,42 @@ if __name__ == '__main__':
     '''
         Prepare train/test (testmode) or train/val/test (valmode) splits
     '''
-    args.file_dir = os.path.dirname(os.path.realpath('__file__'))   # /home/zhaojinye/papers_codes/IGMC
     # testing=True
     if args.testing:
         val_test_appendix = 'testmode'
     else:
         val_test_appendix = 'valmode'
     date_time = time.strftime("%Y_%m_%d")
+    args.file_dir = os.path.dirname(os.path.realpath('__file__'))
     args.res_dir = os.path.join(
         args.file_dir, 'results/{}_{}_{}'.format(
             date_time, args.data_name, val_test_appendix
         )
     )
+
     if args.transfer == '':
         args.model_pos = os.path.join(args.res_dir, 'model_checkpoint{}.pth'.format(args.epochs))
     else:
+        # if transfer is not empty,load the pretrained models in this path
         args.model_pos = os.path.join(args.transfer, 'model_checkpoint{}.pth'.format(args.epochs))
     if not os.path.exists(args.res_dir):
         os.makedirs(args.res_dir)
 
-    # if not args.keep_old and not args.transfer:
-    #     # backup current main.py, model.py files
-    #     copy('Main.py', args.res_dir)
-    #     copy('util_functions.py', args.res_dir)
-    #     copy('models.py', args.res_dir)
-    #     copy('train_eval.py', args.res_dir)
-    if args.use_features:
-        datasplit_path = (
-            'raw_data/' + args.data_name + '/withfeatures_split_seed' +
-            str(args.data_seed) + '.pickle'
-        )
-    else:
-        datasplit_path = (
-            'raw_data/' + args.data_name + '/split_seed' + str(args.data_seed) +
-            '.pickle'
-        )
+    if not args.keep_old and not args.transfer:
+        # backup current main.py, model.py files
+        copy('Main.py', args.res_dir)
+        copy('util_functions.py', args.res_dir)
+        copy('models.py', args.res_dir)
+        copy('train.py', args.res_dir)
+
+
+    datasplit_path = (
+        'raw_data/' + args.data_name + '/split_seed' + str(args.data_seed) +
+        '.pickle'
+    )
     if args.data_name =='musical_instruments':
         (
-            u_features, v_features, adj_train, train_labels, train_u_indices, train_v_indices,
+            adj_train, train_labels, train_u_indices, train_v_indices,
             val_labels, val_u_indices, val_v_indices, test_labels, test_u_indices,
             test_v_indices, class_values, timestamp_mx_train, num_users, num_items
         ) = create_trainvaltest_split(
@@ -196,7 +196,7 @@ if __name__ == '__main__':
         )
     else:
         (
-            u_features, v_features, adj_train, train_labels, train_u_indices, train_v_indices,
+            adj_train, train_labels, train_u_indices, train_v_indices,
             val_labels, val_u_indices, val_v_indices, test_labels, test_u_indices,
             test_v_indices, class_values, timestamp_mx_train, num_users, num_items
         ) = create_trainvaltest_split(
@@ -205,14 +205,7 @@ if __name__ == '__main__':
         )
     print('All ratings are:')
     print(class_values)
-    if args.use_features:
-        u_features, v_features = u_features.toarray(), v_features.toarray()
-        n_features = u_features.shape[1] + v_features.shape[1]
-        print('Number of user features {}, item features {}, total features {}'.format(
-            u_features.shape[1], v_features.shape[1], n_features))
-    else:
-        u_features, v_features = None, None
-        n_features = 0
+
     if args.debug:  # use a small number of data to debug
         num_data = 1000
         train_u_indices, train_v_indices = train_u_indices[:num_data], train_v_indices[:num_data]
@@ -243,7 +236,8 @@ if __name__ == '__main__':
             rmtree('data/{}{}/{}/val'.format(*data_combo))
         if os.path.isdir('data/{}{}/{}/test'.format(*data_combo)):
             rmtree('data/{}{}/{}/test'.format(*data_combo))
-
+    u_features = None
+    v_features = None
     train_graphs = MyDynamicDataset(
         'data/{}{}/{}/train'.format(*data_combo),
         adj_train,  # {narray:(6040，3706)},一共6040个用户，3706个电影。存储的是训练数据，即训练用户对item的评分1-5
@@ -314,8 +308,8 @@ if __name__ == '__main__':
         regression=True,
         adj_dropout=args.adj_dropout,  # 0.0
         force_undirected=args.force_undirected,  # False
-        side_features=args.use_features,  # false,不用side information
-        n_side_features=n_features,  # 0
+        side_features=False,  # false,不用side information
+        n_side_features=0,  # 0
         multiply_by=multiply_by,  # 1
     )
     total_params = sum(p.numel() for param in model.parameters() for p in param)

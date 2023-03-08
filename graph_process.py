@@ -174,7 +174,4 @@ def construct_pyq_graph(graph_message_list, max_node_label, y, temporal_table,te
         pad_graph = data_list[0]
         for i in range(5-len_subgraph):
             data_list.append(pad_graph)
-    # if centre_index[0] > 6039 or centre_index[1] > 9745:
-    #     print("!!!!!!!")
-    #     print(centre_index)
     return tuple(data_list)
