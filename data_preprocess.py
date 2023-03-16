@@ -45,8 +45,8 @@ def download_dataset(dataset, files, data_dir):
 def load_data(fname, seed=1234):
     print('Loading dataset', fname)
     data_dir = 'raw_data/' + fname
-    if fname =='musical_instruments':
-        path = data_dir + '/Musical_Instruments_5.json.gz'
+    if fname in ['musical_instruments','books']:
+        path = data_dir + '/'+fname+'_5.json.gz'
         def parse(path):
             g = gzip.open(path, 'rb')
             for l in g:
@@ -65,27 +65,24 @@ def load_data(fname, seed=1234):
             'u_nodes': np.int64, 'v_nodes': np.int64,
             'ratings': np.float32, 'timestamp': np.float64}
         data0 = df[main_cols]
-        # 删除用户id只出现了一次的行和商品id只出现了1次的行
-        uid_counts = list(data0['reviewerID'].value_counts())
-        uid_ = list(data0['reviewerID'].value_counts().index)
-        vid_counts = list(data0['asin'].value_counts())
-        vid_ = list(data0['asin'].value_counts().index)
-        drop_index = []
-        for i, j in enumerate(tqdm(vid_counts)):
-            if j < 10:
-                index = data0.loc[data0.asin == vid_[i]].index.to_list()
-                drop_index.extend(index)
-        # sec_data0 = data0.loc[y]
-        # data_1 = pd.concat([data0, sec_data0, sec_data0]).drop_duplicates(keep=False)
-        # y0 = []
-        for i, j in enumerate(tqdm(uid_counts)):
-            if j < 10:
-                index = data0.loc[data0.reviewerID == uid_[i]].index.to_list()
-                drop_index.extend(index)
-        # sec_data1 = data_1.loc[y0]
-        # data_1 = pd.concat([data_1, sec_data1, sec_data1]).drop_duplicates(keep=False)
-        drop_index = list(set(drop_index))
-        data_1 = data0.drop(index=drop_index)
+        # 删除用户id只出现了一次的行和商品id只出现少于10次的行
+        # uid_counts = list(data0['reviewerID'].value_counts())
+        # uid_ = list(data0['reviewerID'].value_counts().index)
+        # vid_counts = list(data0['asin'].value_counts())
+        # vid_ = list(data0['asin'].value_counts().index)
+        # drop_index = []
+        # for i, j in enumerate(tqdm(vid_counts)):
+        #     if j < 10:
+        #         index = data0.loc[data0.asin == vid_[i]].index.to_list()
+        #         drop_index.extend(index)
+        # for i, j in enumerate(tqdm(uid_counts)):
+        #     if j < 10:
+        #         index = data0.loc[data0.reviewerID == uid_[i]].index.to_list()
+        #         drop_index.extend(index)
+        # drop_index = list(set(drop_index))
+        # data_1 = data0.drop(index=drop_index)
+        data_ = data0.groupby("reviewerID").filter(lambda x: len(x) > 10)
+        data_1 = data_.groupby("asin").filter(lambda x: len(x) > 10)
         data_array = data_1.values.tolist()
         random.seed(seed)
         random.shuffle(data_array)

@@ -52,7 +52,7 @@ if __name__ == '__main__':
                         transfer/ensemble/visualization')
     parser.add_argument('--debug', action='store_true', default=False,
                         help='turn on debugging mode which uses a small number of data')
-    parser.add_argument('--data-name', default='musical_instruments', help='dataset name')
+    parser.add_argument('--data-name', default='', help='dataset name')  # musical_instrumenets\books\ml_1m
     # parser.add_argument('--data-name', default='ml_1m', help='dataset name')
     parser.add_argument('--data-appendix', default='_mnph100',
                         help='what to append to save-names when saving datasets')
@@ -185,7 +185,7 @@ if __name__ == '__main__':
         'raw_data/' + args.data_name + '/split_seed' + str(args.data_seed) +
         '.pickle'
     )
-    if args.data_name =='musical_instruments':
+    if args.data_name in ['musical_instruments',"books"]:
         (
             adj_train, train_labels, train_u_indices, train_v_indices,
             val_labels, val_u_indices, val_v_indices, test_labels, test_u_indices,
