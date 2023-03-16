@@ -187,7 +187,7 @@ class IGMC(GNN):
             )
             concat_states = []
             for conv in self.convs:  # 根据conv输出维度为n(32)
-                x = torch.tanh(conv(x, edge_index, edge_type))
+                x = torch.tanh(conv(x                                                                                                                                , edge_index, edge_type))
                 concat_states.append(x)
             # (28595,128)
             concat_states = torch.cat(concat_states, 1)  # 4层conv，最后输出4*n,即：(4*32),这里的n是隐藏层的维度
