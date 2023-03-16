@@ -1,0 +1,6 @@
+python==3.8.1
+toch==1.12.1
+torch-geometric==2.2.0
+pandas==1.5.3
+networkx==3.0
+matplotlib==3.7.1
