@@ -52,7 +52,7 @@ if __name__ == '__main__':
                         transfer/ensemble/visualization')
     parser.add_argument('--debug', action='store_true', default=False,
                         help='turn on debugging mode which uses a small number of data')
-    parser.add_argument('--data-name', default='books', help='dataset name')  # musical_instrumenets\books\ml_1m
+    parser.add_argument('--data-name', default='ml_100k', help='dataset name')  # douban\yahoo_music\ml_100k\ml_1m
     # parser.add_argument('--data-name', default='ml_1m', help='dataset name')
     parser.add_argument('--data-appendix', default='_mnph100',
                         help='what to append to save-names when saving datasets')
@@ -142,12 +142,23 @@ if __name__ == '__main__':
         args.max_nodes_per_hop = int(args.max_nodes_per_hop)
 
     rating_map, post_rating_map = None, None
+    if args.standard_rating:
+        if args.data_name == 'yahoo_music':  # original 1, 2, ..., 100
+            rating_map = {x: (x-1)//20+1 for x in range(1, 101)}
+        else:
+            rating_map = None
     # '--transfer', default='',help='if not empty, load the pretrained models in this path'
     if args.transfer:
-        post_rating_map = {
-            x: int(i // (5 / args.num_relations))
-            for i, x in enumerate(np.arange(1, 6).tolist())
-        }
+        if args.data_name == 'yahoo_music':  # original 1, 2, ..., 100
+            post_rating_map = {
+                x: int(i // (100 / args.num_relations))
+                for i, x in enumerate(np.arange(1, 101).tolist())
+            }
+        else:  # assume other datasets have standard ratings 1, 2, 3, 4, 5
+            post_rating_map = {
+                x: int(i // (5 / args.num_relations))
+                for i, x in enumerate(np.arange(1, 6).tolist())
+            }
 
     '''
         Prepare train/test (testmode) or train/val/test (valmode) splits
@@ -181,18 +192,36 @@ if __name__ == '__main__':
         copy('train.py', args.res_dir)
 
 
-    datasplit_path = (
-        'raw_data/' + args.data_name + '/split_seed' + str(args.data_seed) +
-        '.pickle'
-    )
-    if args.data_name in ['musical_instruments',"books"]:
+    if args.data_name == 'ml_1m':
+        datasplit_path = (
+            'raw_data/' + args.data_name + '/split_seed' + str(args.data_seed) +
+            '.pickle'
+        )
+    else:
+        datasplit_path = 'raw_data/' + args.data_name + '/nofeatures.pickle'
+    # if args.data_name in ['musical_instruments', "books"]:
+    #     (
+    #         adj_train, train_labels, train_u_indices, train_v_indices,
+    #         val_labels, val_u_indices, val_v_indices, test_labels, test_u_indices,
+    #         test_v_indices, class_values, timestamp_mx_train, num_users, num_items
+    #     ) = create_trainvaltest_split(
+    #         args.data_name, 1234, args.testing, datasplit_path, True, True, rating_map,
+    #         post_rating_map, args.ratio
+    #     )
+    if args.data_name in ['douban', 'yahoo_music']:
         (
-            adj_train, train_labels, train_u_indices, train_v_indices,
+            u_features, v_features, adj_train, train_labels, train_u_indices, train_v_indices,
             val_labels, val_u_indices, val_v_indices, test_labels, test_u_indices,
-            test_v_indices, class_values, timestamp_mx_train, num_users, num_items
-        ) = create_trainvaltest_split(
-            args.data_name, 1234, args.testing, datasplit_path, True, True, rating_map,
-            post_rating_map, args.ratio
+            test_v_indices, class_values
+        ) = load_data_monti(args.data_name, args.testing, rating_map, post_rating_map)
+    elif args.data_name == 'ml_100k':
+        print("Using official MovieLens split u1.base/u1.test with 20% validation...")
+        (
+            u_features, v_features, adj_train,timestamp_mx_train, train_labels, train_u_indices, train_v_indices,
+            val_labels, val_u_indices, val_v_indices, test_labels, test_u_indices,
+            test_v_indices, class_values,num_users,num_items
+        ) = load_official_trainvaltest_split(
+            args.data_name, args.testing, rating_map, post_rating_map, args.ratio
         )
     else:
         (
