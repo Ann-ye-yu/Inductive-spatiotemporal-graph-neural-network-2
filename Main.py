@@ -122,8 +122,11 @@ if __name__ == '__main__':
                         help="For ml datasets, if ratio < 1, downsample training data to the\
                         target ratio")
     parser.add_argument('--subgraph-num',type=int,default=5,
-                        help= "number of subgrphs")
-
+                        help= "number of subgrphs for each (u,v) after cluster")
+    parser.add_argument('--eps', type=int, default=0.9,
+                        help="Eps-neighborhood of a point of the DBSCAN ")
+    parser.add_argument('--cluster-samples', type=int, default=20,
+                        help="cluster_samples")
 
     '''
         Set seeds, prepare for transfer learning (if --transfer)
@@ -275,6 +278,9 @@ if __name__ == '__main__':
         train_labels,  # {ndarray:(900188)},0-4
         args.hop,  # 1
         args.sample_ratio,  # 1.0
+        args.subgraph_num,
+        args.eps,
+        args.cluster_samples,
         args.max_nodes_per_hop,  # 100
         u_features,  # None
         v_features,  # None
@@ -290,6 +296,9 @@ if __name__ == '__main__':
         test_labels,  # {narray:(100021,)},[3,2,2,4,3,0,.......]
         args.hop,  # 1
         args.sample_ratio,  # 1.0
+        args.subgraph_num,
+        args.eps,
+        args.cluster_samples,
         args.max_nodes_per_hop,  # 100
         u_features,  # None
         v_features,  # None
@@ -307,6 +316,9 @@ if __name__ == '__main__':
             val_labels,
             args.hop,
             args.sample_ratio,
+            args.subgraph_num,
+            args.eps,
+            args.cluster_samples,
             args.max_nodes_per_hop,
             u_features,
             v_features,

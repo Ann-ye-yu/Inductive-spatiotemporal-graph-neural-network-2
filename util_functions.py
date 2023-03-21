@@ -19,7 +19,7 @@ torch.multiprocessing.set_sharing_strategy('file_system')
 
 class MyDynamicDataset(Dataset):
     # root = "data/ml_1m_mnph100/testmode/train"
-    def __init__(self, root, A, T, links, labels, h, sample_ratio, max_nodes_per_hop,
+    def __init__(self, root, A, T, links, labels, h, sample_ratio, subgraph_num, eps, cluster_samples,max_nodes_per_hop,
                  u_features, v_features, class_values, max_num=None):
         super(MyDynamicDataset, self).__init__(root)
         self.T = T
@@ -33,6 +33,9 @@ class MyDynamicDataset(Dataset):
         self.u_features = u_features
         self.v_features = v_features
         self.class_values = class_values
+        self.subgraph_num = subgraph_num
+        self.eps = eps
+        self.cluser_samples = cluster_samples
         if max_num is not None:
             np.random.seed(123)
             num_links = len(links[0])
@@ -52,7 +55,7 @@ class MyDynamicDataset(Dataset):
         g_label = self.labels[idx]
         tmp = subgraph_extraction_labeling(
             (i, j), self.Arow, self.Acol, self.T, self.h, self.sample_ratio, self.max_nodes_per_hop,
-            self.u_features, self.v_features, self.class_values, g_label
+            self.u_features, self.v_features, self.class_values,self.subgraph_num,self.eps,self.cluser_samples, g_label
         )
         results = construct_pyq_graph(*tmp)
         return results
@@ -71,7 +74,7 @@ def build_temporal_order(maxlen, sequence):
     return order, index_bool
 
 def subgraph_extraction_labeling(ind, Arow, Acol, T, h=1, sample_ratio=1.0, max_nodes_per_hop=None,
-                                 u_features=None, v_features=None, class_values=None,
+                                 u_features=None, v_features=None, class_values=None, subgraph_num=5,eps =0.9, cluster_samples=20,
                                  y=1):
     # extract the h-hop enclosing subgraph around link 'ind',ind=(uid,vid)
     u_nodes, v_nodes = [ind[0]], [ind[1]]  # v_nodes: [318], u_nodes: [162]
@@ -147,7 +150,7 @@ def subgraph_extraction_labeling(ind, Arow, Acol, T, h=1, sample_ratio=1.0, max_
     node_index = torch.tensor(node_index)  # (2,200)
 
     # 获得待预测用户所交互的item,按照时间分三部分
-    son_list, num_son, son_timestamp, son_v_dist_list = divide_son_by_cluster(T, ind, v_fringe, v_dist, max_son_length=5)
+    son_list, num_son, son_timestamp, son_v_dist_list = divide_son_by_cluster(T, ind, v_fringe, v_dist, eps, cluster_samples, subgraph_num)
     subgraph_message_list = []
     if num_son > 0:
         for i in range(num_son):
