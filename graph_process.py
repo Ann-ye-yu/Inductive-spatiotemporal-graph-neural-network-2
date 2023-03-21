@@ -39,7 +39,7 @@ def select_MinPts(data, k):
     return np.array(k_dist)
 
 
-def divide_son_by_cluster(T, ind, v_fringe, v_dist, max_son_length):
+def divide_son_by_cluster(T, ind, v_fringe, v_dist, eps, cluster_samples, subgraph_num):
     u_centre = int(ind[0])
     v_centre = int(ind[1])
     # 这里的时间戳统一乘以1e-9转换为0-1之间的数字
@@ -61,7 +61,7 @@ def divide_son_by_cluster(T, ind, v_fringe, v_dist, max_son_length):
     # plt.plot([0,15],[eps,eps],linestyle="--",color = "r")
     # plt.plot([15,15],[0,eps],linestyle="--",color = "r")
     # plt.savefig("results/拐点.jpg")
-    pred_label = DBSCAN(eps=0.9, min_samples=20).fit_predict(v_timestamp_map)
+    pred_label = DBSCAN(eps=eps, min_samples=cluster_samples).fit_predict(v_timestamp_map)
     v_class = list(set(pred_label))
     # 画出聚类结果图
     # 这里将噪声点分开处理了
@@ -120,10 +120,10 @@ def divide_son_by_cluster(T, ind, v_fringe, v_dist, max_son_length):
         son_list_sorted.append(son_list[index_of_son])
         son_timestamp.append(son_timstamp_map[index_of_son])
         son_v_dist_sorted.append(son_v_dist[index_of_son])
-    if len(son_list_sorted) > max_son_length:
-        son_list_sorted = son_list_sorted[:max_son_length]
-        son_timestamp = son_timestamp[:max_son_length]
-        son_v_dist_sorted= son_v_dist_sorted[:max_son_length]
+    if len(son_list_sorted) > subgraph_num:
+        son_list_sorted = son_list_sorted[:subgraph_num]
+        son_timestamp = son_timestamp[:subgraph_num]
+        son_v_dist_sorted = son_v_dist_sorted[:subgraph_num]
     return son_list_sorted, len(son_list_sorted), son_timestamp, son_v_dist_sorted
 
 def processing_songraph(son_graph,u_dist,v_dist,son_u_nodes,son_v_nodes):
