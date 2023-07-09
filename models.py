@@ -187,7 +187,7 @@ class IGMC(GNN):
             )
             concat_states = []
             for conv in self.convs:  # 根据conv输出维度为n(32)
-                x = torch.tanh(conv(x                                                                                                                                , edge_index, edge_type))
+                x = torch.tanh(conv(x, edge_index, edge_type))
                 concat_states.append(x)
             # (28595,128)
             concat_states = torch.cat(concat_states, 1)  # 4层conv，最后输出4*n,即：(4*32),这里的n是隐藏层的维度
@@ -238,7 +238,7 @@ class IGMC(GNN):
         x = graph_emb * output  # (batch_size,5*8*n) (30,1280)
 
         x = torch.cat((graph_tem_emb, x), 1)  # (30, 1920)
-        x = F.relu(self.lin1(x)) # (batch_size,1)
+        x = F.relu(self.lin1(x))  # (batch_size,1)
         x = F.dropout(x, p=0.2, training=self.training)
         x = self.lin2(x)
         # 法2：将所有图的embedding进行concat

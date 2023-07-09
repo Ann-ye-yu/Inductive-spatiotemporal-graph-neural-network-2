@@ -50,9 +50,9 @@ if __name__ == '__main__':
     parser.add_argument('--no-train', action='store_true', default=False,
                         help='if set, skip the training and directly perform the \
                         transfer/ensemble/visualization')
-    parser.add_argument('--debug', action='store_true', default=False,
+    parser.add_argument('--debug', action='store_true', default=True,
                         help='turn on debugging mode which uses a small number of data')
-    parser.add_argument('--data-name', default='ml_100k', help='dataset name')  # douban\yahoo_music\ml_100k\ml_1m
+    parser.add_argument('--data-name', default='yahoo_music', help='dataset name')  # douban\yahoo_music\ml_100k\ml_1m
     # parser.add_argument('--data-name', default='ml_1m', help='dataset name')
     parser.add_argument('--data-appendix', default='_mnph100',
                         help='what to append to save-names when saving datasets')
@@ -237,13 +237,20 @@ if __name__ == '__main__':
         )
     print('All ratings are:')
     print(class_values)
-
     if args.debug:  # use a small number of data to debug
         num_data = 1000
         train_u_indices, train_v_indices = train_u_indices[:num_data], train_v_indices[:num_data]
         val_u_indices, val_v_indices = val_u_indices[:num_data], val_v_indices[:num_data]
         test_u_indices, test_v_indices = test_u_indices[:num_data], test_v_indices[:num_data]
-
+    train_u_indices_set = set(train_u_indices)
+    # train_v_indices_set = set(train_v_indices)
+    test_u_indices_set = set(test_u_indices)
+    # test_v_indices_set = set(test_v_indices)
+    test1 =list(train_u_indices_set&test_u_indices_set)
+    # test2 = list(train_v_indices_set&test_v_indices_set)
+    #
+    # print(list(train_u_indices_set&test_u_indices_set))
+    # print(list(train_v_indices_set&test_v_indices_set))
     train_indices = (train_u_indices, train_v_indices)
     val_indices = (val_u_indices, val_v_indices)
     test_indices = (test_u_indices, test_v_indices)
@@ -252,6 +259,133 @@ if __name__ == '__main__':
         len(val_u_indices),
         len(test_u_indices),
     ))
+
+    # 一阶邻居的平均长度统计
+    Arow = SparseRowIndexer(adj_train)
+    Acol = SparseColIndexer(adj_train.tocsc())
+
+    num_centre = len(train_u_indices)
+    num_neibhors = []
+    num_u_neighbors= []
+    for idx in range(num_centre):
+        u_,v_ = train_indices[0][idx],train_indices[1][idx]
+
+        v_fringe,u_fringe = neighbors(set([u_]),Arow),neighbors(set([v_]),Acol)
+        u_fringe = u_fringe-set([u_])
+        v_fringe = v_fringe-set([v_])
+        num_u_neighbors.append(len(v_fringe))
+        num_neibhor = len(u_fringe)+len(v_fringe)
+        num_neibhors.append(num_neibhor)
+    avg_u_neighbor = sum(num_u_neighbors)/len(num_u_neighbors)
+    avg_train = sum(num_neibhors)/len(num_neibhors)
+
+    num_centre_test = len(test_u_indices)
+    num_neibhors_test = []
+    num_u_neighbor_test = []
+    for idx in range(num_centre_test):
+        u_,v_ = test_indices[0][idx],test_indices[1][idx]
+        v_fringe,u_fringe = neighbors(set([u_]),Arow),neighbors(set([v_]),Acol)
+        u_fringe = u_fringe-set([u_])
+        v_fringe = v_fringe-set([v_])
+        num_u_neighbor_test.append(len(v_fringe))
+        num_neibhor = len(u_fringe)+len(v_fringe)
+        num_neibhors_test.append(num_neibhor)
+    avg_test = sum(num_neibhors_test)/len(num_neibhors_test)
+    avg_u_neighbor_test = sum(num_u_neighbor_test)/len(num_u_neighbor_test)
+    avg_u_neighbors = (avg_u_neighbor+avg_u_neighbor_test)/2
+    avg = (avg_test+avg_train)/2
+
+    u_neighbors_list = num_u_neighbors+num_u_neighbor_test
+    with open("list.txt",'a') as f:
+        f.write(args.data_name+":")
+        f.write("\n")
+        f.write(str(u_neighbors_list))
+        f.write("\n")
+    if args.data_name == "yahoo_music":
+        dic = {
+            "[0,5)":0,
+            "[5,10)":0,
+            "[10,15)":0,
+            "[15,20)":0,
+            "[20,":0
+        }
+        for i in u_neighbors_list:
+            if i<5:
+                dic["[0,5)"]+=1
+            elif 5<=i<10:
+                dic["[5,10)"]+=1
+            elif 10<=i<15:
+                dic["[10,15)"]+=1
+            elif 15<=i<20:
+                dic["[15,20)"]+=1
+            else:
+                dic["[20,"]+=1
+    if args.data_name =="douban":
+        dic = {
+            "[0,20)": 0,
+            "[20,40)": 0,
+            "[40,60)": 0,
+            "[60,)": 0,
+        }
+        for i in u_neighbors_list:
+            if i < 20:
+                dic["[0,20)"] += 1
+            elif 20 <= i < 40:
+                dic["[20,40)"] += 1
+            elif 40 <= i < 60:
+                dic["[40,60)"] += 1
+            else:
+                dic["[60,)"] += 1
+    if args.data_name =="ml_100k":
+        dic = {
+            "[0,10)": 0,
+            "[10,30)":0,
+            "[30,50)":0,
+            "[50,100)":0,
+            "[100,200)": 0,
+            "[200,300)": 0,
+            "[300,400)":0,
+            "[400":0
+        }
+        for i in u_neighbors_list:
+            if i < 10:
+                dic["[0,10)"] += 1
+            if 10<=i < 30:
+                dic["[10,30)"] += 1
+            if 30<=i < 50:
+                dic["[30,50)"] += 1
+            if 50<=i < 100:
+                dic["[50,100)"] += 1
+            elif 100 <= i < 200:
+                dic["[100,200)"] += 1
+            elif 200 <= i < 300:
+                dic["[200,300)"] += 1
+            elif 300 <= i < 400:
+                dic["[300,400)"] += 1
+            else:
+                dic["[400"]+=1
+    if args.data_name =="ml_1m":
+        dic = {
+            "[0,100)": 0,
+            "[100,200)": 0,
+            "[200,300)": 0,
+            "[300,400)": 0,
+            "[400,500)": 0,
+            "[500":0
+        }
+        for i in u_neighbors_list:
+            if i < 100:
+                dic["[0,100)"] += 1
+            elif 100 <= i < 200:
+                dic["[100,200)"] += 1
+            elif 200 <= i < 300:
+                dic["[200,300)"] += 1
+            elif 300 <= i < 400:
+                dic["[300,400)"] += 1
+            elif 400 <= i < 500:
+                dic["[400,500)"] += 1
+            else:
+                dic["[500"] += 1
 
     '''
            Extract enclosing subgraphs to build the train/test or train/val/test graph datasets.

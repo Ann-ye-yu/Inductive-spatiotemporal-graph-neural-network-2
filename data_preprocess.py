@@ -10,10 +10,13 @@ from urllib.request import urlopen
 from zipfile import ZipFile
 import h5py
 from tqdm import tqdm
+from collections import Counter
+
 try:
     from BytesIO import BytesIO
 except ImportError:
     from io import BytesIO
+
 
 def map_data(data):
     uniq = list(set(data))
@@ -21,6 +24,7 @@ def map_data(data):
     data = np.array([id_dict[x] for x in data])
     n = len(uniq)
     return data, id_dict, n
+
 
 def download_dataset(dataset, files, data_dir):
     """ Downloads dataset if files are not present. """
@@ -42,11 +46,14 @@ def download_dataset(dataset, files, data_dir):
             zip_ref.extractall('raw_data/')
 
         os.rename(target_dir, data_dir)
+
+
 def load_data(fname, seed=1234):
     print('Loading dataset', fname)
     data_dir = 'raw_data/' + fname
-    if fname in ['musical_instruments','books']:
-        path = data_dir + '/'+fname+'_5.json.gz'
+    if fname in ['musical_instruments', 'books']:
+        path = data_dir + '/' + fname + '_5.json.gz'
+
         def parse(path):
             g = gzip.open(path, 'rb')
             for l in g:
@@ -127,7 +134,8 @@ def load_data(fname, seed=1234):
         u_nodes, v_nodes = u_nodes_ratings.astype(np.int64), v_nodes_ratings.astype(np.int64)
         ratings = ratings.astype(np.float32)
         timestamp = timestamp.astype(np.float64)
-    return num_users, num_items, u_nodes, v_nodes, ratings,  timestamp
+    return num_users, num_items, u_nodes, v_nodes, ratings, timestamp
+
 
 def create_trainvaltest_split(dataset, seed=1234, testing=False, datasplit_path=None,
                               datasplit_from_file=False, verbose=True, rating_map=None,
@@ -138,19 +146,55 @@ def create_trainvaltest_split(dataset, seed=1234, testing=False, datasplit_path=
     For each split computes 1-of-num_classes labels. Also computes training
     adjacency matrix.
     """
-    if datasplit_from_file and os.path.isfile(datasplit_path):
-        print('Reading processed dataset from file...')
-        with open(datasplit_path,'rb') as f:
-            num_users, num_items, u_nodes, v_nodes, ratings, timestamp = pkl.load(f)
-        print('Number of users = %d' % num_users)
-        print('Number of items = %d' % num_items)
-        print('Number of links = %d' % ratings.shape[0])
-        print('Fraction of positive links = %.4f' % (float(ratings.shape[0]) / (num_users * num_items),))
+    # if datasplit_from_file and os.path.isfile(datasplit_path):
+    #     print('Reading processed dataset from file...')
+    #     with open(datasplit_path, 'rb') as f:
+    #         num_users, num_items, u_nodes, v_nodes, ratings, timestamp = pkl.load(f)
+    #     print('Number of users = %d' % num_users)
+    #     print('Number of items = %d' % num_items)
+    #     print('Number of links = %d' % ratings.shape[0])
+    #     print('Fraction of positive links = %.4f' % (float(ratings.shape[0]) / (num_users * num_items),))
+    #
+    # else:
+    num_users, num_items, u_nodes, v_nodes, ratings, timestamp = load_data(dataset, seed=seed)
+    M = np.zeros((6040, 3706))
+    ratings_index = 0
+    # row = u_nodes_ratings[0]-1
+    # col = v_nodes_ratings[0]-1
+    for i in range(len(ratings)):
+        row = u_nodes[i]
+        col = v_nodes[i]
+        M[row][col] = ratings[i]
+    count_dict = {
+        '<=10': 0,
+        '(10,20]': 0,
+        '(20,30]': 0,
+        '(30,40]': 0,
+        '(40,50]': 0,
+        '(50,100]': 0,
+        '>100': 0
+    }
+    for row in range(len(M)):
+        # print(np.count_nonzero(M[row]))
+        count_row = np.count_nonzero(M[row])
+        if count_row <= 10:
+            count_dict["<=10"] += 1
+        elif 10 < count_row <= 20:
+            count_dict["(10,20]"] += 1
+        elif 20 < count_row <= 30:
+            count_dict["(20,30]"] += 1
+        elif 30 < count_row <= 40:
+            count_dict["(30,40]"] += 1
+        elif 40 < count_row <= 50:
+            count_dict["(40,50]"] += 1
+        elif 50 < count_row <= 100:
+            count_dict["(50,100]"] += 1
+        elif count_row > 100:
+            count_dict[">100"] += 1
 
-    else:
-        num_users, num_items, u_nodes, v_nodes, ratings, timestamp = load_data(dataset,seed=seed)
-        with open(datasplit_path, 'wb') as f:
-            pkl.dump([num_users, num_items, u_nodes, v_nodes, ratings, timestamp], f)
+
+    with open(datasplit_path, 'wb') as f:
+        pkl.dump([num_users, num_items, u_nodes, v_nodes, ratings, timestamp], f)
 
     if rating_map is not None:
         for i, x in enumerate(ratings):
@@ -216,6 +260,7 @@ def load_matlab_file(path_file, name_field):
         '.mat' files should be saved in the '-v7.3' format
     """
     db = h5py.File(path_file, 'r')
+    test1 = db.keys()
     ds = db[name_field]
     try:
         if 'ir' in ds.keys():
@@ -230,6 +275,8 @@ def load_matlab_file(path_file, name_field):
     db.close()
 
     return out
+
+
 def load_data_monti(dataset, testing=False, rating_map=None, post_rating_map=None):
     """
     Loads data from Monti et al. paper.
@@ -267,6 +314,42 @@ def load_data_monti(dataset, testing=False, rating_map=None, post_rating_map=Non
     v_nodes_ratings = np.where(M)[1]
     ratings = M[np.where(M)]
 
+    M_ = np.zeros((3000, 3000))
+    ratings_index = 0
+    # row = u_nodes_ratings[0]-1
+    # col = v_nodes_ratings[0]-1
+    for i in range(len(ratings)):
+        row = u_nodes_ratings[i]
+        col = v_nodes_ratings[i]
+        M_[row][col] = ratings[i]
+
+    count_dict = {
+        '(0,10]': 0,
+        '(10,20]': 0,
+        '(20,30]': 0,
+        '(30,40]': 0,
+        '(40,50]': 0,
+        '(50,100]': 0,
+        '>100': 0
+    }
+    for row in range(len(M_)):
+        # print(np.count_nonzero(M[row]))
+        count_row = np.count_nonzero(M_[row])
+        if 0<count_row <= 10:
+            count_dict["(0,10]"] += 1
+        elif 10 < count_row <= 20:
+            count_dict["(10,20]"] += 1
+        elif 20 < count_row <= 30:
+            count_dict["(20,30]"] += 1
+        elif 30 < count_row <= 40:
+            count_dict["(30,40]"] += 1
+        elif 40 < count_row <= 50:
+            count_dict["(40,50]"] += 1
+        elif 50 < count_row <= 100:
+            count_dict["(50,100]"] += 1
+        elif count_row > 100:
+            count_dict[">100"] += 1
+
     u_nodes_ratings, v_nodes_ratings = u_nodes_ratings.astype(np.int64), v_nodes_ratings.astype(np.int32)
     ratings = ratings.astype(np.float64)
 
@@ -285,7 +368,7 @@ def load_data_monti(dataset, testing=False, rating_map=None, post_rating_map=Non
     labels[u_nodes, v_nodes] = np.array([rating_dict[r] for r in ratings])
 
     for i in range(len(u_nodes)):
-        assert(labels[u_nodes[i], v_nodes[i]] == rating_dict[ratings[i]])
+        assert (labels[u_nodes[i], v_nodes[i]] == rating_dict[ratings[i]])
 
     labels = labels.reshape([-1])
 
@@ -316,7 +399,7 @@ def load_data_monti(dataset, testing=False, rating_map=None, post_rating_map=Non
     train_idx = idx_nonzero[num_val:num_train + num_val]
     test_idx = idx_nonzero[num_train + num_val:]
 
-    assert(len(test_idx) == num_test)
+    assert (len(test_idx) == num_test)
 
     val_pairs_idx = pairs_nonzero[0:num_val]
     train_pairs_idx = pairs_nonzero[num_val:num_train + num_val]
@@ -350,7 +433,6 @@ def load_data_monti(dataset, testing=False, rating_map=None, post_rating_map=Non
 
     rating_mx_train = sp.csr_matrix(rating_mx_train.reshape(num_users, num_items))
 
-
     if u_features is not None:
         u_features = sp.csr_matrix(u_features)
         print("User features shape: " + str(u_features.shape))
@@ -360,7 +442,7 @@ def load_data_monti(dataset, testing=False, rating_map=None, post_rating_map=Non
         print("Item features shape: " + str(v_features.shape))
 
     return u_features, v_features, rating_mx_train, train_labels, u_train_idx, v_train_idx, \
-        val_labels, u_val_idx, v_val_idx, test_labels, u_test_idx, v_test_idx, class_values
+           val_labels, u_val_idx, v_val_idx, test_labels, u_test_idx, v_test_idx, class_values
 
 
 def load_official_trainvaltest_split(dataset, testing=False, rating_map=None, post_rating_map=None, ratio=1.0):
@@ -407,7 +489,41 @@ def load_official_trainvaltest_split(dataset, testing=False, rating_map=None, po
     u_nodes_ratings = data_array[:, 0].astype(dtypes['u_nodes'])
     v_nodes_ratings = data_array[:, 1].astype(dtypes['v_nodes'])
     ratings = data_array[:, 2].astype(dtypes['ratings'])
-    timestamp = data_array[:,3].astype(dtypes['timestamp'])
+    timestamp = data_array[:, 3].astype(dtypes['timestamp'])
+    M = np.zeros((943,1682))
+    ratings_index = 0
+    # row = u_nodes_ratings[0]-1
+    # col = v_nodes_ratings[0]-1
+    for i in range(len(ratings)):
+        row = u_nodes_ratings[i]-1
+        col = v_nodes_ratings[i]-1
+        M[row][col] = ratings[i]
+    count_dict = {
+        '<=10': 0,
+        '(10,20]': 0,
+        '(20,30]': 0,
+        '(30,40]': 0,
+        '(40,50]': 0,
+        '(50,100]': 0,
+        '>100': 0
+    }
+    for row in range(len(M)):
+        # print(np.count_nonzero(M[row]))
+        count_row = np.count_nonzero(M[row])
+        if count_row <= 10:
+            count_dict["<=10"] += 1
+        elif 10 < count_row <= 20:
+            count_dict["(10,20]"] += 1
+        elif 20 < count_row <= 30:
+            count_dict["(20,30]"] += 1
+        elif 30 < count_row <= 40:
+            count_dict["(30,40]"] += 1
+        elif 40 < count_row <= 50:
+            count_dict["(40,50]"] += 1
+        elif 50 < count_row <= 100:
+            count_dict["(50,100]"] += 1
+        elif count_row > 100:
+            count_dict[">100"] += 1
     if rating_map is not None:
         for i, x in enumerate(ratings):
             ratings[i] = rating_map[x]
@@ -431,8 +547,6 @@ def load_official_trainvaltest_split(dataset, testing=False, rating_map=None, po
 
     time_labels = np.full((num_users, num_items), neutral_rating, dtype=np.int32)
     time_labels[u_nodes, v_nodes] = np.array(timestamp)
-
-
 
     for i in range(len(u_nodes)):
         assert (labels[u_nodes[i], v_nodes[i]] == rating_dict[ratings[i]])
@@ -512,7 +626,7 @@ def load_official_trainvaltest_split(dataset, testing=False, rating_map=None, po
         rating_mx_train[train_idx] = np.array([post_rating_map[r] for r in class_values[labels[train_idx]]]) + 1.
 
     rating_mx_train = sp.csr_matrix(rating_mx_train.reshape(num_users, num_items))
-    timestamp_mx_train = sp.csr_matrix(timestamp_mx_train.reshape(num_users,num_items))
+    timestamp_mx_train = sp.csr_matrix(timestamp_mx_train.reshape(num_users, num_items))
 
     if dataset == 'ml_100k':
 
@@ -628,6 +742,5 @@ def load_official_trainvaltest_split(dataset, testing=False, rating_map=None, po
     print("User features shape: " + str(u_features.shape))
     print("Item features shape: " + str(v_features.shape))
 
-    return u_features, v_features, rating_mx_train,timestamp_mx_train, train_labels, u_train_idx, v_train_idx, \
-           val_labels, u_val_idx, v_val_idx, test_labels, u_test_idx, v_test_idx, class_values,num_users,num_items
-
+    return u_features, v_features, rating_mx_train, timestamp_mx_train, train_labels, u_train_idx, v_train_idx, \
+           val_labels, u_val_idx, v_val_idx, test_labels, u_test_idx, v_test_idx, class_values, num_users, num_items
