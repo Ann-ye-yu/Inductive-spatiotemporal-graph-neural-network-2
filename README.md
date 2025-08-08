@@ -8,7 +8,7 @@ tqdm==4.66.1
 Parameter Configuration:
 
 - test_ratio: test ratio within `0.2,0.5,0.8`, default for `0.2`
-- dataset: You can run our method on this three dataset by setting this parameter.
+- dataset: You can run our method on this three dataset by setting the follow parameter.
 
     *parameter`1`represents dataset `tgt_CDs_and_Vinyl_src_Movies_and_TV`,
 
@@ -42,7 +42,3 @@ Test the model by this command.
 If you want to see the test process, you can use the command：
     
     tail -f sh_test.log
-### log
-    Log path of the pretrain stage: /Domain-recommendation-branch3/log/pretrain
-    Log path of the train stage: /Domain-recommendation-branch3/log/train
-    Lof path of the test stage: /Domain-recommendation-branch3/log/test
