@@ -1,8 +1,12 @@
 ### Dependency
 Python 3.8, 
+
 Pytorch 1.9.1,
+
 scipy==1.10.0
+
 scikit-learn==1.3.1
+
 tqdm==4.66.1
 ### Dataset
 we evaluate our AHCFCDR framework using the widely-used Amazon review dataset: https://jmcauley.ucsd.edu/data/amazon/.
